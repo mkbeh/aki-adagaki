@@ -18,12 +18,14 @@ class JSONEncoder(json.JSONEncoder):
 
 class MongoDB(object):
     def __init__(self, db_name):
+        self.db_name = db_name
+
         try:
-            cxn = MongoClient()
+            self.cxn = MongoClient()
         except errors.AutoReconnect:
             raise RuntimeError()
 
-        self.db = cxn[db_name]
+        self.db = self.cxn[db_name]
         self.collection = None
 
     def db_dump(self):
@@ -104,6 +106,15 @@ class MongoDB(object):
         self.collection = self.db[collection_name]
 
         return self.collection.count(filter_)
+
+    def drop_database(self):
+        self.cxn.drop_database(self.db_name)
+        self.finish()
+
+    def drop_collection(self, collection_name):
+        self.collection = self.db[collection_name]
+
+        self.collection.drop()
 
     def finish(self):
         self.db.logout()

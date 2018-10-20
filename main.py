@@ -21,24 +21,17 @@ class Parser(object):
             'https': "socks5://127.0.0.1:9050"
         }
         self.client = requests.Session()
-        self.db_documents = self.get_data()
-        self.currencies_names = [document.get('currency') for document in self.db_documents]
         self.url_with_all_crypto = 'https://coinmarketcap.com/all/views/all/'
         self.page_url = 'https://coinmarketcap.com/{}'
         self.market_url = 'https://coinmarketcap.com{}#markets'
         self.lock = Lock()
         self.processes_num = 1      # Desired number of processes (Set your val, but need proxy)
+        self.drop_db()
 
     @staticmethod
-    def get_data():
-        """
-        Method which get data from db.
-        :return:
-        """
+    def drop_db():
         mongo = pymongodb.MongoDB('cmc')
-        documents = mongo.find({}, 'currencies')
-
-        return documents
+        mongo.drop_database()
 
     def get_html(self, url, tor=False):
         """
@@ -137,25 +130,12 @@ class Parser(object):
         full_desc_links = [link['href'] for link in links]
         full_desc_links = list(map(lambda x: self.market_url.format(x.strip()), full_desc_links))
 
-        # Write data.
-        if self.db_documents:
-            for name in currencies_names:
-                if name not in self.currencies_names:
-                    link = full_desc_links[currencies_names.index(name)]
+        # Find markets for all found currencies.
+        markets = [self.parse_markets(self.get_html(url)) for url in full_desc_links]
 
-                    # Find market for specific currency.
-                    markets = self.parse_markets(self.get_html(link))
-
-                    self.write_data(currency=name, markets=markets.markets,
-                                    markets_count=markets.amount)
-
-        else:
-            # Find markets for all found currencies.
-            markets = [self.parse_markets(self.get_html(url)) for url in full_desc_links]
-
-            for i in range(len(currencies_names)):
-                self.write_data(currency=currencies_names[i], markets=markets[i].markets,
-                                markets_count=markets[i].amount)
+        for i in range(len(currencies_names)):
+            self.write_data(currency=currencies_names[i], markets=markets[i].markets,
+                            markets_count=markets[i].amount)
 
     def run(self):
         """
